@@ -1,9 +1,9 @@
 #include "simple_vector.h"
+#include "old_tests.h"
 
 #include <cassert>
 #include <iostream>
 #include <numeric>
-#include <string>
 
 using namespace std;
 
@@ -12,18 +12,23 @@ public:
     X()
         : X(5) {
     }
+
     X(size_t num)
         : x_(num) {
     }
+
     X(const X& other) = delete;
     X& operator=(const X& other) = delete;
-    X(X&& other) {
+
+    X(X&& other) noexcept {
         x_ = exchange(other.x_, 0);
     }
-    X& operator=(X&& other) {
+
+    X& operator=(X&& other) noexcept {
         x_ = exchange(other.x_, 0);
         return *this;
     }
+
     size_t GetX() const {
         return x_;
     }
@@ -40,49 +45,49 @@ SimpleVector<int> GenerateVector(size_t size) {
 
 void TestTemporaryObjConstructor() {
     const size_t size = 1000000;
-    cout << "Test with temporary object, copy elision"s << endl;
+    cout << "Test with temporary object, copy elision" << endl;
     SimpleVector<int> moved_vector(GenerateVector(size));
     assert(moved_vector.GetSize() == size);
-    cout << "Done!"s << endl << endl;
+    cout << "Done!" << endl << endl;
 }
 
 void TestTemporaryObjOperator() {
     const size_t size = 1000000;
-    cout << "Test with temporary object, operator="s << endl;
+    cout << "Test with temporary object, operator=" << endl;
     SimpleVector<int> moved_vector;
     assert(moved_vector.GetSize() == 0);
     moved_vector = GenerateVector(size);
     assert(moved_vector.GetSize() == size);
-    cout << "Done!"s << endl << endl;
+    cout << "Done!" << endl << endl;
 }
 
 void TestNamedMoveConstructor() {
     const size_t size = 1000000;
-    cout << "Test with named object, move constructor"s << endl;
+    cout << "Test with named object, move constructor" << endl;
     SimpleVector<int> vector_to_move(GenerateVector(size));
     assert(vector_to_move.GetSize() == size);
 
     SimpleVector<int> moved_vector(move(vector_to_move));
     assert(moved_vector.GetSize() == size);
     assert(vector_to_move.GetSize() == 0);
-    cout << "Done!"s << endl << endl;
+    cout << "Done!" << endl << endl;
 }
 
 void TestNamedMoveOperator() {
     const size_t size = 1000000;
-    cout << "Test with named object, operator="s << endl;
+    cout << "Test with named object, operator=" << endl;
     SimpleVector<int> vector_to_move(GenerateVector(size));
     assert(vector_to_move.GetSize() == size);
 
     SimpleVector<int> moved_vector = move(vector_to_move);
     assert(moved_vector.GetSize() == size);
     assert(vector_to_move.GetSize() == 0);
-    cout << "Done!"s << endl << endl;
+    cout << "Done!" << endl << endl;
 }
 
 void TestNoncopiableMoveConstructor() {
     const size_t size = 5;
-    cout << "Test noncopiable object, move constructor"s << endl;
+    cout << "Test noncopiable object, move constructor" << endl;
     SimpleVector<X> vector_to_move;
     for (size_t i = 0; i < size; ++i) {
         vector_to_move.PushBack(X(i));
@@ -95,12 +100,12 @@ void TestNoncopiableMoveConstructor() {
     for (size_t i = 0; i < size; ++i) {
         assert(moved_vector[i].GetX() == i);
     }
-    cout << "Done!"s << endl << endl;
+    cout << "Done!" << endl << endl;
 }
 
 void TestNoncopiablePushBack() {
     const size_t size = 5;
-    cout << "Test noncopiable push back"s << endl;
+    cout << "Test noncopiable push back" << endl;
     SimpleVector<X> v;
     for (size_t i = 0; i < size; ++i) {
         v.PushBack(X(i));
@@ -111,43 +116,84 @@ void TestNoncopiablePushBack() {
     for (size_t i = 0; i < size; ++i) {
         assert(v[i].GetX() == i);
     }
-    cout << "Done!"s << endl << endl;
+    cout << "Done!" << endl << endl;
+}
+
+void TestÑopiableInsert() {
+    const size_t size = 5;
+    cout << "Test copiable insert" << endl;
+    SimpleVector<int> v;
+    for (int i = 0; i < size; ++i) {
+        v.PushBack(i);
+    }
+
+    // â íà÷àëî
+    v.Insert(v.begin(), size + 1);
+    assert(v.GetSize() == size + 1);
+    assert(*(v.begin()) == size + 1);
+
+    // â êîíåö
+    v.Insert(v.end(), size + 2);
+    assert(v.GetSize() == size + 2);
+    assert(*(v.end() - 1) == size + 2);
+
+    // â ñåðåäèíó
+    v.Insert(v.begin() + 3, size + 3);
+    assert(v.GetSize() == size + 3);
+    assert(*(v.begin() + 3) == size + 3);
+
+    // â êîíåö è ïðîâåðêà âîçâðàùàåìîãî çíàå÷íèÿ
+    assert(v.Insert(v.end(), -10) == v.end() - 1);
+    cout << "Done!" << endl << endl;
 }
 
 void TestNoncopiableInsert() {
     const size_t size = 5;
-    cout << "Test noncopiable insert"s << endl;
+    cout << "Test noncopiable insert" << endl;
     SimpleVector<X> v;
     for (size_t i = 0; i < size; ++i) {
         v.PushBack(X(i));
     }
 
-    // Ð² Ð½Ð°Ñ‡Ð°Ð»Ð¾
+    // â íà÷àëî
     v.Insert(v.begin(), X(size + 1));
     assert(v.GetSize() == size + 1);
     assert(v.begin()->GetX() == size + 1);
-    // Ð² ÐºÐ¾Ð½ÐµÑ†
+
+    // â êîíåö
     v.Insert(v.end(), X(size + 2));
     assert(v.GetSize() == size + 2);
     assert((v.end() - 1)->GetX() == size + 2);
-    // Ð² ÑÐµÑ€ÐµÐ´Ð¸Ð½Ñƒ
+
+    // â ñåðåäèíó
     v.Insert(v.begin() + 3, X(size + 3));
     assert(v.GetSize() == size + 3);
     assert((v.begin() + 3)->GetX() == size + 3);
-    cout << "Done!"s << endl << endl;
+    cout << "Done!" << endl << endl;
 }
 
 void TestNoncopiableErase() {
     const size_t size = 3;
-    cout << "Test noncopiable erase"s << endl;
+    cout << "Test noncopiable erase" << endl;
     SimpleVector<X> v;
     for (size_t i = 0; i < size; ++i) {
         v.PushBack(X(i));
     }
 
+    /*for (auto it = v.begin(); it != v.end(); it++) {
+        std::cout << it->GetX() << " ";
+    }
+    std::cout << std::endl;*/
+
     auto it = v.Erase(v.begin());
+
+    /*for (auto it = v.begin(); it != v.end(); it++) {
+        std::cout << it->GetX() << " ";
+    }
+    std::cout << std::endl;*/
+
     assert(it->GetX() == 1);
-    cout << "Done!"s << endl << endl;
+    cout << "Done!" << endl << endl;
 }
 
 int main() {
@@ -157,7 +203,17 @@ int main() {
     TestNamedMoveOperator();
     TestNoncopiableMoveConstructor();
     TestNoncopiablePushBack();
+
+    TestÑopiableInsert();
     TestNoncopiableInsert();
+    
     TestNoncopiableErase();
+
+    // ÒÅÑÒÛ ÈÇ 9 ÒÅÌÛ
+    Test1();
+    Test2();
+    TestReserveConstructor();
+    TestReserveMethod();
+
     return 0;
 }
