@@ -1,6 +1,7 @@
 #pragma once
 
-#include <stdexcept> // содержит std::logic_error
+#include <stdexcept>
+#include <utility>
 
 template <typename Type>
 class ArrayPtr {
@@ -9,12 +10,7 @@ public:
     ArrayPtr() = default;
 
     explicit ArrayPtr(size_t size) {
-        if (size == 0) {
-            ArrayPtr();
-        }
-        else {
-            raw_ptr_ = new Type[size]{};
-        }
+        raw_ptr_ = new Type[size]{};  
     }
 
     explicit ArrayPtr(Type* raw_ptr) noexcept {
@@ -23,7 +19,9 @@ public:
 
     ArrayPtr(const ArrayPtr&) = delete;
 
-    ArrayPtr(ArrayPtr&&) = default;
+    ArrayPtr(ArrayPtr&& other) noexcept : raw_ptr_(other.raw_ptr_) {
+        other.raw_ptr_ = nullptr;
+    };
 
     ~ArrayPtr() {
         delete[] raw_ptr_;
@@ -32,7 +30,17 @@ public:
 
     ArrayPtr& operator=(const ArrayPtr&) = delete;
 
-    ArrayPtr& operator=(ArrayPtr&&) = default;
+    ArrayPtr& operator=(ArrayPtr&& other) noexcept {
+        if (&other == this)
+            return *this;
+
+        delete raw_ptr_;
+
+        raw_ptr_ = other.raw_ptr_;
+        other.raw_ptr_ = nullptr; 
+
+        return *this;
+    }
 
     [[nodiscard]] Type* Release() noexcept {
         Type* returned_ptr = raw_ptr_;
@@ -49,7 +57,7 @@ public:
     }
 
     explicit operator bool() const {
-        return raw_ptr_ != nullptr ? true : false;
+        return raw_ptr_;
     }
 
     Type* Get() const noexcept {
@@ -57,9 +65,7 @@ public:
     }
 
     void swap(ArrayPtr& other) noexcept {
-        Type* buffer = raw_ptr_;
-        raw_ptr_ = other.raw_ptr_;
-        other.raw_ptr_ = buffer;
+        std::swap(*this, other);
     }
 
 private:

@@ -1,0 +1,184 @@
+Fix 02.07.22
+
+
+Файл array_ptr.h
+
+1) строка 13
+
+    explicit ArrayPtr(size_t size) {
+        if (size == 0) {
+            ArrayPtr();
+ 
+Удален вызов конструктора по умолчанию. Удалено if/else.
+
+2) строка 26
+
+    ArrayPtr(ArrayPtr&&) = default;
+
+Добавлен полноценный конструктор перемещения, также реализован оператор перемещения
+
+3) строка 52
+
+    explicit operator bool() const {
+        return raw_ptr_ != nullptr ? true : false;
+ 
+Удален тренарный оператор
+
+4) строка 62
+
+    void swap(ArrayPtr& other) noexcept {
+        Type* buffer = raw_ptr_;
+        raw_ptr_ = other.raw_ptr_;
+        other.raw_ptr_ = buffer;
+
+Благодоря реализации конструктора и оператора перемещания метод swap изменен с применением std::swap <utility>
+
+
+Файл simple_vector.h
+
+5) строка 43
+
+    explicit SimpleVector(size_t size) : 
+        size_(size), capacity_(size), items_(new Type[size]{ 0 }) {
+
+Во всех конструкторах убрано прямое создание через new. Добавлен конструктор items_(ArrayPtr<Type>(size));
+
+6) строка 48
+
+explicit SimpleVector(ReserveProxyObj obj) :
+    size_(0u), capacity_(obj.GetVoid()), items_(new Type[obj.GetVoid()]{}) {
+    obj.~ReserveProxyObj();
+
+Добавлен конструктор ArrayPtr (п.5). Удален вызов прямой вызов деструктора.
+
+7) строка 51
+
+    SimpleVector(size_t size, const Type& value) :
+        size_(size), capacity_(size), items_(new Type[size]{ 0 }) {
+        for (size_t i = 0; i != size; i++) {
+        items_[i] = value;
+        }
+
+Добавлен конструктор ArrayPtr (п.5). Наполнение реализовано через std::fill
+
+8) строка 58
+
+    SimpleVector(std::initializer_list<Type> init) :
+        size_(init.size()), capacity_(init.size()), items_(new Type[init.size()]{ 0 }) {
+        int i = 0;
+        for (auto init_unit = init.begin(); init_unit != init.end(); init_unit++) {
+            items_[i] = *init_unit;
+            i++;
+        }
+ 
+Добавлен конструктор ArrayPtr (п.5). Наполнение реализовано через std::copy
+
+9) строка 75
+
+    SimpleVector(const SimpleVector& other) {
+        size_t other_size = other.GetSize();
+        SimpleVector tmp(other_size);
+        int i = 0;
+        for (auto it = other.begin(); it != other.end(); it++) {
+            tmp.items_[i] = *it;
+            i++;
+        }
+        swap(tmp);
+
+Конструктор переработан и реализован с помощью std::copy
+
+10) строка 82
+
+    SimpleVector(SimpleVector&& other) noexcept :
+        size_(other.size_), capacity_(other.capacity_), items_(std::move(other.items_)) {
+        other.size_ = 0;
+        other.capacity_ = 0;
+        assert(other.items_.Release() == begin());
+    } 
+ 
+При работе конструктора приведение other.items_ к nullptr выполнялось с помощью метода Release()
+Так как метод Release() отмечен флагом [nodiscard] возвращаемое значение использовалось в assert
+После изменения конструктора и оператора перемещения (п.2) assert потерял свою актуальнось. Удален.
+
+11) строка 105
+
+    bool IsEmpty() const noexcept {
+        return (size_ == 0 ? 1 : 0);
+    }
+
+return метода изменен
+
+12) строка 109
+
+    Type& operator[](size_t index) noexcept {
+        return items_[index];
+    }
+ 
+Добавлены Assert-проверки на (index < size_) и (index >= 0)
+
+13) строка 113
+
+    const Type& operator[](size_t index) const noexcept {
+        return At(index);
+    }
+
+Добавлены проверки (п.12), вывод метода изменен
+
+14) строка 138
+    
+    void Resize(size_t new_size)
+
+Изменена архитектура метода, также наполнение элементов реализовано через std::move
+
+15) строка 181
+
+    void Reserve(size_t new_capacity)
+
+Наполнение метода изменено с использованием std::move
+
+16) строка 191
+
+    Iterator end() noexcept {
+        return &items_[size_];
+    }
+ 
+Вывод return изменен. Также и в двух аналогичных методах
+
+17) строка 211
+
+    void PushBack(const Type& item)
+
+Изменена архитектура метода
+
+18) строка 232
+
+    void PushBack(Type&& item)
+
+Изменена архитектура метода. Применен перенос с помощью std::move вместо std::swap
+
+19) строка 254 (и далее)
+
+    Iterator Insert(ConstIterator pos, const Type& value)
+
+В методах Insert и Erase добавлены проверки на попадание итератора в диапазон items_.begin(), items_.(end)
+В методах Insert и Erase функционал std::copy и std::copy_backward, заменен на std::move и std::move_backward соответственно
+
+20) строка 317 (и далее)
+
+    void PopBack()
+
+Удалено избыточное ветвление if/else в методах PopBack и Erase
+
+21) строка 407
+
+    template <typename Type>
+    inline bool operator==(const SimpleVector<Type>& lhs, const SimpleVector<Type>& rhs)
+
+Удалены лишние проверки. использован std::equal на 4х итераторах
+
+22) строка 422
+
+    template <typename Type>
+    inline bool operator<=(const SimpleVector<Type>& lhs, const SimpleVector<Type>& rhs)
+
+Переработаны реализации операция <, >, <=, >=
