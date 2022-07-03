@@ -40,43 +40,48 @@ public:
     SimpleVector() noexcept = default;
 
     explicit SimpleVector(size_t size) : 
-        size_(size), capacity_(size), items_(ArrayPtr<Type>(size)) {
+        size_(size), capacity_(size), items_(size) {
     }
 
     explicit SimpleVector(ReserveProxyObj obj) :
-        size_(0u), capacity_(obj.GetVoid()), items_(ArrayPtr<Type>(obj.GetVoid())) {
+        size_(0u), capacity_(obj.GetVoid()), items_(obj.GetVoid()) {
     }
 
     SimpleVector(size_t size, const Type& value) :
-        size_(size), capacity_(size), items_(ArrayPtr<Type>(size)) {
+        size_(size), capacity_(size), items_(size) {
         std::fill(begin(), end(), value);
     }
 
     SimpleVector(std::initializer_list<Type> init) :
-        size_(init.size()), capacity_(init.size()), items_(ArrayPtr<Type>(init.size())) {
+        size_(init.size()), capacity_(init.size()), items_(init.size()) {
         std::copy(init.begin(), init.end(), begin());
     }
 
     SimpleVector(const SimpleVector& other) : 
-        size_(other.GetSize()), capacity_(other.GetSize()), items_(ArrayPtr<Type>(other.GetSize())) {
+        size_(other.GetSize()), capacity_(other.GetSize()), items_(other.GetSize()) {
         std::copy(other.begin(), other.end(), begin());
     }
 
     SimpleVector(SimpleVector&& other) noexcept :
-        size_(other.size_), capacity_(other.capacity_), items_(std::move(other.items_)) {
-        other.size_ = 0;
-        other.capacity_ = 0;
+        capacity_{ std::exchange(other.capacity_, 0) },
+        size_{std::exchange(other.size_, 0)}, items_(std::move(other.items_)) {
     } 
 
     SimpleVector& operator=(const SimpleVector& rhs) {
-        if (this == &rhs) { 
-            return *this;
-        }
-        else {
+        if (this != &rhs) {
             SimpleVector tmp(rhs);
             swap(tmp);
-            return *this;
-        }
+        }  
+        return *this;
+    }
+
+    SimpleVector& operator=(SimpleVector&& rhs) {
+        if (this != &rhs) {
+            items_ = std::move(rhs.items_);
+            size_ = std::exchange(rhs.size_, 0);
+            capacity_ = std::exchange(rhs.capacity_, 0);
+        } 
+        return *this;
     }
 
     size_t GetSize() const noexcept {
@@ -92,13 +97,11 @@ public:
     }
 
     Type& operator[](size_t index) noexcept {
-        assert(index >= 0);
         assert(index < size_);
         return items_[index];
     }
 
     const Type& operator[](size_t index) const noexcept {
-        assert(index >= 0);
         assert(index < size_);
         return const_cast<Type>(items_[index]);
     }
